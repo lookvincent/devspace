@@ -94,6 +94,9 @@ export async function openLinuxArtifactTarget({
           partialPath = undefined;
         } catch (error) {
           if (isNodeError(error) && error.code === "EEXIST") throw destinationExistsError();
+          if (isNodeError(error) && error.code === "EXDEV") {
+            throw new ArtifactError("artifact_cross_device_publish", "Native file partial and destination are on different filesystems.");
+          }
           throw error;
         }
       },

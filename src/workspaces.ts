@@ -5,6 +5,7 @@ import type {
   WorkspaceMode,
   WorkspaceStore,
 } from "./workspace-store.js";
+import { realpathSync } from "node:fs";
 import { mkdir, opendir, readFile, realpath, stat } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { loadProjectContextFiles } from "@earendil-works/pi-coding-agent";
@@ -402,11 +403,12 @@ export class WorkspaceRegistry {
       if (!sourceRoot) {
         throw new Error(`Stored worktree workspace is missing sourceRoot: ${root}`);
       }
-      assertAllowedPath(sourceRoot, this.config.allowedRoots);
-      return assertAllowedPath(root, [this.config.worktreeRoot]);
+      const resolvedSource = tryRealpathSync(sourceRoot) ?? sourceRoot;
+      assertAllowedPath(resolvedSource, this.config.allowedRoots);
+      return assertAllowedPath(tryRealpathSync(root) ?? root, [this.config.worktreeRoot]);
     }
 
-    return assertAllowedPath(root, this.config.allowedRoots);
+    return assertAllowedPath(tryRealpathSync(root) ?? root, this.config.allowedRoots);
   }
 
   private async loadInitialAgentsFiles(root: string): Promise<LoadedAgentsFile[]> {
@@ -554,6 +556,15 @@ async function tryRealpath(path: string): Promise<string | undefined> {
     return undefined;
   }
 }
+
+function tryRealpathSync(path: string): string | undefined {
+  try {
+    return realpathSync(path);
+  } catch {
+    return undefined;
+  }
+}
+
 
 async function walkWorkspace(
   directory: string,
