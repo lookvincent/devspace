@@ -6,7 +6,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
 import { mcpAuthRouter, getOAuthProtectedResourceMetadataUrl } from "@modelcontextprotocol/sdk/server/auth/router.js";
 import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js";
-import { checkResourceAllowed, resourceUrlFromServerUrl } from "@modelcontextprotocol/sdk/shared/auth-utils.js";
+import { resourceUrlFromServerUrl } from "@modelcontextprotocol/sdk/shared/auth-utils.js";
 import { createMcpHandler } from "@modelcontextprotocol/server";
 import { toNodeHandler } from "@modelcontextprotocol/node";
 import {
@@ -44,6 +44,7 @@ import { createReviewCheckpointManager } from "./review-checkpoints.js";
 import { conversationScopeIdFromRequestMeta } from "./request-meta.js";
 import { shutdownHttpServer } from "./server-shutdown.js";
 import { formatPathForPrompt } from "./skills.js";
+import { DEVSPACE_VERSION } from "./version.js";
 import { createWorkspaceStore } from "./workspace-store.js";
 import { formatAgentsPath, WorkspaceRegistry } from "./workspaces.js";
 import {
@@ -78,7 +79,7 @@ function mcpServerInfo() {
   return {
     name: "devspace",
     title: "DevSpace",
-    version: "0.1.0",
+    version: DEVSPACE_VERSION,
     description:
       "Coding tools for project workspaces. Open each project or worktree once, then reuse its workspaceId.",
   };
@@ -645,7 +646,7 @@ function registerMcpSurface(
     },
     async ({ workspaceId, ...input }) => {
       const startedAt = performance.now();
-      const workspace = workspaces.getWorkspace(workspaceId);
+      const workspace = await workspaces.getWorkspace(workspaceId);
       const readPath = workspaces.resolveReadPath(workspace, input.path);
       const response = await readFileTool(
         { ...input, path: readPath.absolutePath },
@@ -708,7 +709,7 @@ function registerMcpSurface(
     },
     async ({ workspaceId }, { _meta }) => {
       const startedAt = performance.now();
-      const workspace = workspaces.getWorkspace(workspaceId);
+      const workspace = await workspaces.getWorkspace(workspaceId);
       const reviewRef = typeof _meta?.["devspace/reviewRef"] === "string"
         ? _meta["devspace/reviewRef"]
         : undefined;
@@ -920,7 +921,7 @@ export function createServer(
     });
     if (res.headersSent) return;
 
-    if (!req.auth?.resource || !checkResourceAllowed({ requestedResource: req.auth.resource, configuredResource: resourceServerUrl })) {
+    if (!req.auth?.resource || !oauthProvider.isResourceAllowed(req.auth.resource)) {
       logEvent(config.logging, "warn", "auth_denied", {
         requestId,
         method: req.method,
